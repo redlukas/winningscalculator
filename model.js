@@ -83,13 +83,32 @@ async function togglePlayingStatus(id){
     const players = await Player.find();
     return players;
 }
-
-
 app.get(basePath+"players/togglePlaying/:id", (req, res) =>{
     togglePlayingStatus(req.params.id)
         .then(players=>res.json(players))
-        .catch(err=>res.status(400).send(err))
+        .catch(err=>res.status(400).send(err.toString()))
 });
+
+async function addDeuce(id){
+    let player = await Player.findById(id);
+    if(!player){
+        throw Error("Player not found");
+    }
+    if(player.isStillPlaying) {
+        player.deuces++;
+    } else throw Error("Cannot increment deuce count of inactive player")
+    await player.save()
+    const players = await Player.find();
+    return players;
+}
+app.get(basePath + "players/deuce/:id", (req, res)=>{
+    addDeuce(req.params.id)
+        .then(players=>res.json(players))
+        .catch(err=> {
+            console.log("err:",err);
+            res.status(400).send(err.toString())
+        })
+})
 
 //START EXPRESS
 app.listen(PORT, HOST);
