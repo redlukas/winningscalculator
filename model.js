@@ -4,6 +4,7 @@ const express = require('express');
 const mongoose = require("mongoose");
 const Joi = require("joi");
 const bodyParser = require("body-parser");
+const cors = require("cors");
 
 // SET UP EXPRESS
 const PORT = process.env.PORT || 8888;
@@ -11,6 +12,9 @@ const HOST = '0.0.0.0';
 const app = express();
 const basePath = "/api/";
 const jsonParser = bodyParser.json();
+app.use(cors({
+    origin: '*'
+}));
 
 //SET UP MONGOOSE
 mongoose.connect('mongodb://localhost/winnings')
@@ -77,6 +81,12 @@ async function togglePlayingStatus(id){
         const players = await Player.find();
         player.rank = players.filter(player=>player.isStillPlaying).length;
     } else{
+        const players = await Player.find();
+        for (let pl of players){
+            if(pl.rank && pl.rank<player.rank){
+                throw Error("You may only deeliminate the player that was eliminated the latest")
+            }
+        }
         player.rank=null;
     }
     await player.save()
