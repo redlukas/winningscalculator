@@ -10,9 +10,7 @@ const PORT = process.env.PORT || 8888;
 const HOST = '0.0.0.0';
 const app = express();
 const basePath = "/api/";
-console.log("HELLO")
 const jsonParser = bodyParser.json();
-console.log("world");
 
 //SET UP MONGOOSE
 mongoose.connect('mongodb://localhost/winnings')
@@ -34,14 +32,6 @@ const winningsSchema = new mongoose.Schema({
 
 const Player = mongoose.model('Player', playerSchema);
 const Winning = mongoose.model('Winning', winningsSchema);
-/*
-const defaultPlayer = new Player({
-    name: "some other Player Name"
-});
-
-defaultPlayer.save()
-    .then(res=>console.log("result of save operation: ", res))
-*/
 
 //Joi schemas
 const postPlayer = Joi.object({
@@ -80,10 +70,21 @@ app.post(basePath+"players",jsonParser, (req, res)=>{
 async function togglePlayingStatus(id){
     let player = await Player.findById(id);
     if(!player){
-        throw Error("Player not found")
+        throw Error("Player not found");
     }
-
+    player.isStillPlaying = !player.isStillPlaying;
+    if(!player.isStillPlaying){
+        const players = await Player.find();
+        player.rank = players.filter(player=>player.isStillPlaying).length;
+    } else{
+        player.rank=null;
+    }
+    await player.save()
+    const players = await Player.find();
+    return players;
 }
+
+
 app.get(basePath+"players/togglePlaying/:id", (req, res) =>{
     togglePlayingStatus(req.params.id)
         .then(players=>res.json(players))
