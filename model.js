@@ -120,6 +120,24 @@ app.get(basePath + "players/deuce/:id", (req, res)=>{
         })
 })
 
+async function handleDelete(id){
+    const player = await Player.findById(id);
+    if(!player){
+        throw Error("Player not found");
+    }
+    await Player.deleteOne({_id: id});
+    const players = await Player.find();
+    return players;
+}
+app.delete(basePath + "players/:id", (req, res) =>{
+    handleDelete(req.params.id)
+        .then(players=>res.json(players))
+        .catch(err=>{
+            console.log("error:",err);
+            res.status(400).send(err.toString())
+        })
+})
+
 //START EXPRESS
 app.listen(PORT, HOST);
 console.log(`Running on http://${HOST}:${PORT}`);
