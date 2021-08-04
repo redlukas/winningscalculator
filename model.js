@@ -21,15 +21,15 @@ app.use(cors({
 
 //SET UP MONGOOSE
 mongoose.connect('mongodb://localhost/winnings')
-    .then(()=>console.log("connected to mongodb"))
-    .catch(err=>console.log("Connection to mongodb failed", err));
+    .then(() => console.log("connected to mongodb"))
+    .catch(err => console.log("Connection to mongodb failed", err));
 
 
 const playerSchema = new mongoose.Schema({
     name: String,
-    rank: {type: Number, default:null},
-    deuces: {type:Number, default:0},
-    isStillPlaying: {type:Boolean, default:true}
+    rank: {type: Number, default: null},
+    deuces: {type: Number, default: 0},
+    isStillPlaying: {type: Boolean, default: true}
 });
 
 const winningsSchema = new mongoose.Schema({
@@ -37,106 +37,184 @@ const winningsSchema = new mongoose.Schema({
     winnings: Number
 })
 
+const gameSchema = new mongoose.Schema({
+    isRunning: Boolean
+})
+
 const Player = mongoose.model('Player', playerSchema);
 const Winning = mongoose.model('Winning', winningsSchema);
+const Game = mongoose.model("Game", gameSchema);
 
 //Joi schemas
 const postPlayer = Joi.object({
     name: Joi.string().required().alphanum().max(15).truncate()
 });
 
+
+
 //REST CALLS
 app.get(basePath + "players", (req, res) => {
     Player.find()
-        .then(players=>res.json(players))
+        .then(players => res.json(players))
 });
 
-app.get(basePath+"players/:id", (req, res) =>{
+app.get(basePath + "players/:id", (req, res) => {
     Player.findById(req.params.id)
-        .then(player=>res.json(player))
-        .catch(err=> {
+        .then(player => res.json(player))
+        .catch(err => {
             console.log(err);
             return res.status(404).send("Player not found")
         })
-    });
+});
 
-app.post(basePath+"players",jsonParser, (req, res)=>{
+app.post(basePath + "players", jsonParser, (req, res) => {
     const {error, value} = postPlayer.validate(req.body);
-    if(error){
+    if (error) {
         return res.status(400).send(error.details[0].message)
     } else {
         const newPlayer = new Player({
             name: value.name
         });
         newPlayer.save()
-            .then(result=>res.json(result))
+            .then(result => res.json(result))
     }
 });
 
 
-async function togglePlayingStatus(id){
+async function togglePlayingStatus(id) {
     let player = await Player.findById(id);
-    if(!player){
+    if (!player) {
         throw Error("Player not found");
     }
     player.isStillPlaying = !player.isStillPlaying;
-    if(!player.isStillPlaying){
+    if (!player.isStillPlaying) {
         const players = await Player.find();
-        player.rank = players.filter(player=>player.isStillPlaying).length;
-    } else{
+        player.rank = players.filter(player => player.isStillPlaying).length;
+    } else {
         const players = await Player.find();
-        for (let pl of players){
-            if(pl.rank && pl.rank<player.rank){
+        for (let pl of players) {
+            if (pl.rank && pl.rank < player.rank) {
                 throw Error("You may only deeliminate the player that was eliminated the latest")
             }
         }
-        player.rank=null;
+        player.rank = null;
     }
     await player.save()
     const players = await Player.find();
     return players;
 }
-app.get(basePath+"players/togglePlaying/:id", (req, res) =>{
+
+app.get(basePath + "players/togglePlaying/:id", (req, res) => {
     togglePlayingStatus(req.params.id)
-        .then(players=>res.json(players))
-        .catch(err=>res.status(400).send(err.toString()))
+        .then(players => res.json(players))
+        .catch(err => res.status(400).send(err.toString()))
 });
 
-async function addDeuce(id){
+async function addDeuce(id) {
     let player = await Player.findById(id);
-    if(!player){
+    if (!player) {
         throw Error("Player not found");
     }
-    if(player.isStillPlaying) {
+    if (player.isStillPlaying) {
         player.deuces++;
     } else throw Error("Cannot increment deuce count of inactive player")
     await player.save()
     const players = await Player.find();
     return players;
 }
-app.get(basePath + "players/deuce/:id", (req, res)=>{
+
+app.get(basePath + "players/deuce/:id", (req, res) => {
     addDeuce(req.params.id)
-        .then(players=>res.json(players))
-        .catch(err=> {
-            console.log("err:",err);
+        .then(players => res.json(players))
+        .catch(err => {
+            console.log("err:", err);
+            res.status(400).send(err.toString())
+        })
+})
+async function startGame(){
+    let theGame=await Game.find();
+    theGame=theGame[0];
+    console.log("before starting the game: ", theGame);
+    theGame.isRunning=true;
+    await theGame.save();
+    theGame = await Game.find();
+    return theGame;
+}
+app.get(basePath + "game/start", (req, res) => {
+    startGame()
+        .then(game => res.json(game))
+        .catch(err => {
+            console.log("err:", err);
             res.status(400).send(err.toString())
         })
 })
 
-async function handleDelete(id){
+async function endGame(){
+    let theGame=await Game.find();
+    theGame=theGame[0];
+    console.log("before ending the game: ", theGame);
+    theGame.isRunning=false;
+    await theGame.save();
+    theGame = await Game.find();
+    return theGame
+}
+app.get(basePath + "game/end", (req, res) => {
+    endGame()
+        .then(game => res.json(game))
+        .catch(err => {
+            console.log("err:", err);
+            res.status(400).send(err.toString())
+        })
+})
+
+
+async function resetPlayers() {
+    let players = await Player.find();
+    for (let player of players) {
+        player.set({
+            deuces: 0,
+            rank: null,
+            isStillPlaying: true
+        });
+        await player.save();
+    }
+    const updatedPlayers = await Player.find();
+    return updatedPlayers;
+}
+
+app.get(basePath + "game/reset", (req, res) => {
+    resetPlayers()
+        .then(players => res.json(players))
+        .catch(err => {
+            console.log("err:", err);
+            res.status(400).send(err.toString())
+        })
+})
+
+
+app.get(basePath + "game/state", (req, res) => {
+    Game.find()
+        .then(game=> {
+            let theGame=game[0];
+            res.json(theGame);
+        })
+})
+
+async function handleDelete(id) {
     const player = await Player.findById(id);
-    if(!player){
+    if (!player) {
         throw Error("Player not found");
     }
     await Player.deleteOne({_id: id});
     const players = await Player.find();
     return players;
 }
-app.delete(basePath + "players/:id", (req, res) =>{
+
+app.delete(basePath + "players/:id", (req, res) => {
     handleDelete(req.params.id)
-        .then(players=>res.json(players))
-        .catch(err=>{
-            console.log("error:",err);
+        .then(players => res.json(players))
+        .catch(err => {
+            console.log("error:", err);
             res.status(400).send(err.toString())
         })
 })
