@@ -16,6 +16,9 @@ app.use(cors({
     origin: '*'
 }));
 
+//TODO: save the state of the game (started, not started) to the db and let the model react accorningly
+
+
 //SET UP MONGOOSE
 mongoose.connect('mongodb://localhost/winnings')
     .then(()=>console.log("connected to mongodb"))
