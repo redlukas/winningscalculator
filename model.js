@@ -134,7 +134,6 @@ app.get(basePath + "players/deuce/:id", (req, res) => {
 async function startGame(){
     let theGame=await Game.find();
     theGame=theGame[0];
-    console.log("before starting the game: ", theGame);
     theGame.isRunning=true;
     await theGame.save();
     theGame = await Game.find();
@@ -152,7 +151,6 @@ app.get(basePath + "game/start", (req, res) => {
 async function endGame(){
     let theGame=await Game.find();
     theGame=theGame[0];
-    console.log("before ending the game: ", theGame);
     theGame.isRunning=false;
     await theGame.save();
     theGame = await Game.find();
