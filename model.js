@@ -56,7 +56,7 @@ const postBet = Joi.object({
 })
 const postWinning = Joi.object({
     rank: Joi.number().integer().positive(),
-    percentage: Joi.number().integer().positive()
+    percentage: Joi.number().integer().greater(-1)
 })
 
 
@@ -311,6 +311,12 @@ app.post(basePath + "game/winnings", jsonParser, (req, res) => {
             .then(winnings => res.json(winnings))
             .catch(err => res.status(400).send(err.toString()))
     }
+})
+
+app.get(basePath + "game/winnings", (req,res)=>{
+    Winning.find()
+        .then(winnings=>res.json(winnings))
+        .catch(err=> res.status(400).send(err.toString()))
 })
 
 //START EXPRESS
