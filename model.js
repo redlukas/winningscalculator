@@ -16,7 +16,6 @@ app.use(cors({
     origin: '*'
 }));
 
-//TODO: save the state of the game (started, not started) to the db and let the model react accorningly
 
 
 //SET UP MONGOOSE
@@ -67,24 +66,40 @@ app.get(basePath + "players/:id", (req, res) => {
         })
 });
 
+
+async function addPlayer(playerName){
+    let theGame=await Game.find();
+    theGame=theGame[0];
+    if(theGame.isRunning){
+        throw Error("Cannot add a player while the game is running")
+    }
+    const newPlayer = new Player({
+        name: playerName
+    });
+    await newPlayer.save();
+    const players = await Player.find();
+    return players;
+}
 app.post(basePath + "players", jsonParser, (req, res) => {
     const {error, value} = postPlayer.validate(req.body);
     if (error) {
         return res.status(400).send(error.details[0].message)
     } else {
-        const newPlayer = new Player({
-            name: value.name
-        });
-        newPlayer.save()
-            .then(result => res.json(result))
+        addPlayer(value.name)
+            .then(players => res.json(players))
+            .catch(err => res.status(400).send(err.toString()))
     }
 });
-
 
 async function togglePlayingStatus(id) {
     let player = await Player.findById(id);
     if (!player) {
         throw Error("Player not found");
+    }
+    let theGame=await Game.find();
+    theGame=theGame[0];
+    if(!theGame.isRunning){
+        throw Error("Cannot toggle player if the game is not running")
     }
     player.isStillPlaying = !player.isStillPlaying;
     if (!player.isStillPlaying) {
@@ -114,6 +129,11 @@ async function addDeuce(id) {
     let player = await Player.findById(id);
     if (!player) {
         throw Error("Player not found");
+    }
+    let theGame=await Game.find();
+    theGame=theGame[0];
+    if(!theGame.isRunning){
+        throw Error("Cannot add deuce if the game is not running")
     }
     if (player.isStillPlaying) {
         player.deuces++;
