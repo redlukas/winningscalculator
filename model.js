@@ -37,7 +37,8 @@ const winningsSchema = new mongoose.Schema({
 })
 
 const gameSchema = new mongoose.Schema({
-    isRunning: Boolean
+    isRunning: Boolean,
+    bet: Number
 })
 
 const Player = mongoose.model('Player', playerSchema);
@@ -90,6 +91,26 @@ app.post(basePath + "players", jsonParser, (req, res) => {
             .catch(err => res.status(400).send(err.toString()))
     }
 });
+
+
+async function handleDelete(id) {
+    const player = await Player.findById(id);
+    if (!player) {
+        throw Error("Player not found");
+    }
+    await Player.deleteOne({_id: id});
+    const players = await Player.find();
+    return players;
+}
+app.delete(basePath + "players/:id", (req, res) => {
+    handleDelete(req.params.id)
+        .then(players => res.json(players))
+        .catch(err => {
+            console.log("error:", err);
+            res.status(400).send(err.toString())
+        })
+})
+
 
 async function togglePlayingStatus(id) {
     let player = await Player.findById(id);
@@ -153,7 +174,17 @@ app.get(basePath + "players/deuce/:id", (req, res) => {
 })
 async function startGame(){
     let theGame=await Game.find();
+    while(theGame.length===0){
+        console.log("creating game singleton");
+        const newGame = new Game({
+            isRunning: false,
+            bet: null
+        });
+        await newGame.save();
+        theGame=await Game.find();
+    }
     theGame=theGame[0];
+    console.log("The Game is",theGame);
     theGame.isRunning=true;
     await theGame.save();
     theGame = await Game.find();
@@ -215,25 +246,6 @@ app.get(basePath + "game/state", (req, res) => {
         .then(game=> {
             let theGame=game[0];
             res.json(theGame);
-        })
-})
-
-async function handleDelete(id) {
-    const player = await Player.findById(id);
-    if (!player) {
-        throw Error("Player not found");
-    }
-    await Player.deleteOne({_id: id});
-    const players = await Player.find();
-    return players;
-}
-
-app.delete(basePath + "players/:id", (req, res) => {
-    handleDelete(req.params.id)
-        .then(players => res.json(players))
-        .catch(err => {
-            console.log("error:", err);
-            res.status(400).send(err.toString())
         })
 })
 
