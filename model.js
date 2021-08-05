@@ -49,7 +49,9 @@ const Game = mongoose.model("Game", gameSchema);
 const postPlayer = Joi.object({
     name: Joi.string().required().alphanum().max(15).truncate()
 });
-
+const postBet = Joi.object({
+    bet: Joi.number().integer().positive()
+})
 
 
 //REST CALLS
@@ -172,7 +174,8 @@ app.get(basePath + "players/deuce/:id", (req, res) => {
             res.status(400).send(err.toString())
         })
 })
-async function startGame(){
+
+async function getGame(){
     let theGame=await Game.find();
     while(theGame.length===0){
         console.log("creating game singleton");
@@ -183,11 +186,15 @@ async function startGame(){
         await newGame.save();
         theGame=await Game.find();
     }
-    theGame=theGame[0];
-    console.log("The Game is",theGame);
+    return theGame[0];
+}
+
+
+async function startGame(){
+    let theGame = await getGame();
     theGame.isRunning=true;
     await theGame.save();
-    theGame = await Game.find();
+    theGame = await getGame();
     return theGame;
 }
 app.get(basePath + "game/start", (req, res) => {
@@ -200,12 +207,11 @@ app.get(basePath + "game/start", (req, res) => {
 })
 
 async function endGame(){
-    let theGame=await Game.find();
-    theGame=theGame[0];
+    let theGame=await getGame();
     theGame.isRunning=false;
     await theGame.save();
-    theGame = await Game.find();
-    return theGame
+    theGame = await getGame();
+    return theGame;
 }
 app.get(basePath + "game/end", (req, res) => {
     endGame()
@@ -247,6 +253,28 @@ app.get(basePath + "game/state", (req, res) => {
             let theGame=game[0];
             res.json(theGame);
         })
+})
+
+async function setBet(bet){
+    let theGame=await getGame();
+    if(theGame.isRunning){
+        throw Error("Cannot set bet while game is running")
+    }
+    theGame.bet=bet;
+    await theGame.save();
+    theGame = await getGame();
+    console.log("updated game to:",theGame);
+    return theGame;
+}
+app.post(basePath + "game/bet", jsonParser, (req, res) =>{
+    const {error, value} = postBet.validate(req.body);
+    if (error) {
+        return res.status(400).send(error.details[0].message)
+    } else {
+        setBet(value.bet)
+            .then(game => res.json(game))
+            .catch(err => res.status(400).send(err.toString()))
+    }
 })
 
 //START EXPRESS
