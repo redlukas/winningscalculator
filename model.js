@@ -288,6 +288,8 @@ app.post(basePath + "game/bet", jsonParser, (req, res) => {
 })
 
 async function createWinning(rank, percentage) {
+    const theGame = await getGame();
+    if(theGame.isRunning) throw Error("Cannot set winning while the game is running")
     const winnings = await Winning.find();
     for (let win of winnings) {
         if (win.rank === rank) {
@@ -317,6 +319,20 @@ app.get(basePath + "game/winnings", (req,res)=>{
     Winning.find()
         .then(winnings=>res.json(winnings))
         .catch(err=> res.status(400).send(err.toString()))
+})
+
+async function deleteWinnings(){
+    let winnings = await Winning.find();
+    for(let win of winnings){
+        await Winning.deleteOne({_id: win.id});
+    }
+    winnings = await Winning.find();
+    return winnings;
+}
+app.get(basePath + "game/winnings/reset", (req,res)=>{
+    deleteWinnings()
+        .then(winnings=>res.json(winnings))
+        .catch(err => res.status(400).send(err.toString()))
 })
 
 //START EXPRESS
