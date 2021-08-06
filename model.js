@@ -439,20 +439,13 @@ async function calculateEarnings() {
     //normalize the payments among the players
     for (let player of players) {
         for (let item of player.winnings) {
-            console.log("key: " + item[0] + " value " + item[1]);
             if (item[0] !== player.id && item[0] !== "pot") {
                 const otherPlayer = await Player.findById(item[0]);
                 let thisPlayersCredit = item[1];
-                console.log("this player has a credit of ", thisPlayersCredit);
                 let otherPlayersCredit = otherPlayer.winnings.get(player.id);
-                console.log("the other player has a credit of ", otherPlayersCredit);
                 const smallerNumber = thisPlayersCredit < otherPlayersCredit ? thisPlayersCredit : otherPlayersCredit;
-                console.log(smallerNumber + " is the smaller number");
                 thisPlayersCredit -= smallerNumber;
                 otherPlayersCredit -= smallerNumber;
-                console.log("this players credit was set to ", thisPlayersCredit);
-                console.log("the other players credit was set to", otherPlayersCredit);
-                console.log("");
                 player.winnings.set(item[0], thisPlayersCredit);
                 otherPlayer.winnings.set(player.id, otherPlayersCredit);
                 await player.save();
