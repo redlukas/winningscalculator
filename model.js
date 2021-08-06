@@ -28,7 +28,7 @@ const playerSchema = new mongoose.Schema({
     rank: {type: Number, default: null},
     deuces: {type: Number, default: 0},
     isStillPlaying: {type: Boolean, default: true},
-    winnings: {type:Map, of:Number, default:{}}
+    winnings: {type: Map, of: Number, default: {}}
 });
 
 const winningsSchema = new mongoose.Schema({
@@ -39,7 +39,8 @@ const winningsSchema = new mongoose.Schema({
 
 const gameSchema = new mongoose.Schema({
     isRunning: {type: Boolean, default: false},
-    bet: {type: Number, default: 5}
+    bet: {type: Number, default: 5},
+    moneyDistributed: {type: Boolean, default: false}
 })
 
 const Player = mongoose.model('Player', playerSchema);
@@ -172,9 +173,9 @@ async function addDeuce(id) {
 
     //increment the other player's deuce owes
     const players = await Player.find()
-    for(let pla of players){
-        if(pla.isStillPlaying && pla.id!==id){
-            player.winnings.set(pla.id, player.winnings.get(pla.id)+1)
+    for (let pla of players) {
+        if (pla.isStillPlaying && pla.id !== id) {
+            player.winnings.set(pla.id, player.winnings.get(pla.id) + 1)
         }
     }
     await player.save()
@@ -211,7 +212,7 @@ async function getGame() {
 async function startGame() {
     //check if the winnings total matches
     let winMatch = await checkWinningsTotal();
-    if(!winMatch) throw Error("Winnings total does not match")
+    if (!winMatch) throw Error("Winnings total does not match")
 
     //start the game
     let theGame = await getGame();
@@ -220,20 +221,20 @@ async function startGame() {
 
     //initialize the player's winnings maps
     let players = await Player.find();
-    let myMap={};
-    for(let pla of players){
+    let myMap = {};
+    for (let pla of players) {
         myMap[pla.id] = 0;
     }
-    for(let pla of players){
-        pla.winnings=myMap;
+    for (let pla of players) {
+        pla.winnings = myMap;
         await pla.save();
     }
-
 
 
     theGame = await getGame();
     return theGame;
 }
+
 app.get(basePath + "game/start", (req, res) => {
     startGame()
         .then(game => res.json(game))
@@ -275,6 +276,7 @@ async function resetPlayers() {
     const updatedPlayers = await Player.find();
     return updatedPlayers;
 }
+
 app.get(basePath + "game/reset", (req, res) => {
     resetPlayers()
         .then(players => res.json(players))
@@ -317,7 +319,7 @@ app.post(basePath + "game/bet", jsonParser, (req, res) => {
 
 async function createWinning(rank, percentage) {
     const theGame = await getGame();
-    if(theGame.isRunning) throw Error("Cannot set winning while the game is running")
+    if (theGame.isRunning) throw Error("Cannot set winning while the game is running")
     const winnings = await Winning.find();
     for (let win of winnings) {
         if (win.rank === rank) {
@@ -332,6 +334,7 @@ async function createWinning(rank, percentage) {
     const newWinnings = Winning.find();
     return newWinnings;
 }
+
 app.post(basePath + "game/winnings", jsonParser, (req, res) => {
     const {error, value} = postWinning.validate(req.body);
     if (error) {
@@ -343,77 +346,126 @@ app.post(basePath + "game/winnings", jsonParser, (req, res) => {
     }
 })
 
-app.get(basePath + "game/winnings", (req,res)=>{
+app.get(basePath + "game/winnings", (req, res) => {
     Winning.find()
-        .then(winnings=>res.json(winnings))
-        .catch(err=> res.status(400).send(err.toString()))
+        .then(winnings => res.json(winnings))
+        .catch(err => res.status(400).send(err.toString()))
 })
 
-async function deleteWinnings(){
+async function deleteWinnings() {
     const theGame = await getGame();
-    if(theGame.isRunning) throw Error("Cannot reset winnings while the game is running")
+    if (theGame.isRunning) throw Error("Cannot reset winnings while the game is running")
     let winnings = await Winning.find();
-    for(let win of winnings){
+    for (let win of winnings) {
         await Winning.deleteOne({_id: win.id});
     }
     winnings = await Winning.find();
     return winnings;
 }
-app.get(basePath + "game/winnings/reset", (req,res)=>{
+
+app.get(basePath + "game/winnings/reset", (req, res) => {
     deleteWinnings()
-        .then(winnings=>res.json(winnings))
+        .then(winnings => res.json(winnings))
         .catch(err => res.status(400).send(err.toString()))
 })
 
-async function checkWinningsTotal(){
+async function checkWinningsTotal() {
     const winnings = await Winning.find();
     const players = await Player.find();
     let total = 0;
-    for(let win of winnings){
-        total+=win.winningsPercentage;
+    for (let win of winnings) {
+        total += win.winningsPercentage;
     }
-    total=total/100;
-    const result = total===players.length
-    if(!result){
+    total = total / 100;
+    const result = total === players.length
+    if (!result) {
         toast.error("Winnings do not match with number of players!")
     }
     return result
 }
 
-async function calculateEarnings(){
+async function calculateEarnings() {
     const winnings = await Winning.find();
-    const players = await Player.find();
+    let players = await Player.find();
     const game = await getGame();
 
     //check if game is still running
-    if(game.isRunning) throw Error("cannot calculate earnings while game is still running")
+    if (game.isRunning) throw Error("cannot calculate earnings while game is still running")
 
     //check if all players have been assigned a rank
-    for(let pla of players){
-        if(!pla.rank) throw Error("All players need to have a rank assigned to calculate the earnings")
+    for (let pla of players) {
+        if (!pla.rank) throw Error("All players need to have a rank assigned to calculate the earnings")
     }
 
+    if (game.moneyDistributed) return players;
+
     //calculate the winnings per rank
-    for(let pla of players){
+    for (let pla of players) {
         const rank = pla.rank;
-        for(let rk of winnings){
-            if(rk.rank === rank){
-                const factor = rk.winningsPercentage/100;
-                const win = game.bet*factor;
+        for (let rk of winnings) {
+            if (rk.rank === rank) {
+                const factor = rk.winningsPercentage / 100;
+                const win = game.bet * factor;
                 pla.winnings.set("pot", win);
 
             }
         }
-        if(!pla.winnings.get("pot")) pla.winnings.set("pot", 0)
+        if (!pla.winnings.get("pot")) pla.winnings.set("pot", 0)
         await pla.save();
     }
+    players = await Player.find();
+
+    //distribute the pot money to the other players
+    const otherPlayers = players.length - 1;
+    const toTheOthers = game.bet / otherPlayers;
+    for (let player of players) {
+        player.winnings.forEach((item, key) => {
+            if (key !== player.id && key !== "pot") {
+                const oldNumber = item;
+                const newNumber = oldNumber + toTheOthers;
+                player.winnings.set(key, newNumber)
+            }
+        })
+        await player.save();
+    }
+    players = await Player.find();
+
+    //equalize the payments among the players
+    for (let player of players) {
+        for (let item of player.winnings) {
+            console.log("key: " + item[0] + " value " + item[1]);
+            if (item[0] !== player.id && item[0] !== "pot") {
+                const otherPlayer = await Player.findById(item[0]);
+                let thisPlayersCredit = item[1];
+                console.log("this player has a credit of ", thisPlayersCredit);
+                let otherPlayersCredit = otherPlayer.winnings.get(player.id);
+                console.log("the other player has a credit of ", otherPlayersCredit);
+                const smallerNumber = thisPlayersCredit < otherPlayersCredit ? thisPlayersCredit : otherPlayersCredit;
+                console.log(smallerNumber + " is the smaller number");
+                thisPlayersCredit -= smallerNumber;
+                otherPlayersCredit -= smallerNumber;
+                console.log("this players credit was set to ", thisPlayersCredit);
+                console.log("the other players credit was set to", otherPlayersCredit);
+                player.winnings.set(item[0], thisPlayersCredit);
+                otherPlayer.winnings.set(player.id, otherPlayersCredit);
+                await player.save();
+                await otherPlayer.save();
+            }
+
+        }
+    }
+    players = await Player.find();
 
 
+    //game.moneyDistributed=true;
+    await game.save();
     return players;
 }
-app.get(basePath + "game/earnings", (req,res)=>{
+
+
+app.get(basePath + "game/earnings", (req, res) => {
     calculateEarnings()
-        .then(earnings=>res.json(earnings))
+        .then(earnings => res.json(earnings))
         .catch(err => res.status(400).send(err.toString()))
 })
 
