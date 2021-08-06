@@ -263,7 +263,7 @@ app.get(basePath + "game/end", (req, res) => {
 
 
 async function resetPlayers() {
-    let players = await Player.find();
+    const players = await Player.find();
     for (let player of players) {
         player.set({
             deuces: 0,
@@ -273,6 +273,10 @@ async function resetPlayers() {
         });
         await player.save();
     }
+    let game = await getGame();
+    game.moneyDistributed=false;
+    await game.save();
+
     const updatedPlayers = await Player.find();
     return updatedPlayers;
 }
@@ -432,7 +436,7 @@ async function calculateEarnings() {
     }
     players = await Player.find();
 
-    //equalize the payments among the players
+    //normalize the payments among the players
     for (let player of players) {
         for (let item of player.winnings) {
             console.log("key: " + item[0] + " value " + item[1]);
@@ -460,7 +464,7 @@ async function calculateEarnings() {
     players = await Player.find();
 
 
-    //game.moneyDistributed=true;
+    game.moneyDistributed=true;
     await game.save();
     return players;
 }
