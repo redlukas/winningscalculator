@@ -27,7 +27,8 @@ const playerSchema = new mongoose.Schema({
     name: String,
     rank: {type: Number, default: null},
     deuces: {type: Number, default: 0},
-    isStillPlaying: {type: Boolean, default: true}
+    isStillPlaying: {type: Boolean, default: true},
+    deuceOwes: {type:Map, of: Number}
 });
 
 const winningsSchema = new mongoose.Schema({
@@ -49,7 +50,7 @@ const Game = mongoose.model("Game", gameSchema);
 
 //Joi schemas
 const postPlayer = Joi.object({
-    name: Joi.string().required().alphanum().max(15).truncate()
+    name: Joi.string().required().max(15).truncate().pattern(/^\s*\w+(?:[^\w,]+\w+)*[^,\w]*$/)
 });
 const postBet = Joi.object({
     bet: Joi.number().integer().positive()
@@ -157,21 +158,33 @@ app.get(basePath + "players/togglePlaying/:id", (req, res) => {
 });
 
 async function addDeuce(id) {
+    //check if the player exists
     let player = await Player.findById(id);
-    if (!player) {
-        throw Error("Player not found");
-    }
-    let theGame = await Game.find();
-    theGame = theGame[0];
-    if (!theGame.isRunning) {
-        throw Error("Cannot add deuce if the game is not running")
-    }
-    if (player.isStillPlaying) {
-        player.deuces++;
-    } else throw Error("Cannot increment deuce count of inactive player")
+    if (!player) throw Error("Player not found");
+
+    //check if the game is in progress
+    const theGame = await getGame();
+    if (!theGame.isRunning) throw Error("Cannot add deuce if the game is not running")
+
+    //check if the player is still playing
+    if (!player.isStillPlaying) throw Error("Cannot increment deuce count of inactive player")
+
+    //increment the player's deuce count
+    player.deuces++;
     await player.save()
-    const players = await Player.find();
-    return players;
+
+    //increment the other player's deuce owes
+    const players = await Player.find()
+    for(let pla of players){
+        if(pla.isStillPlaying && pla.id!==id){
+            pla.deuceOwes.set(id, pla.deuceOwes.get(id)+1)
+            await pla.save();
+        }
+    }
+
+
+    const playyers = await Player.find();
+    return playyers;
 }
 
 app.get(basePath + "players/deuce/:id", (req, res) => {
@@ -199,13 +212,25 @@ async function getGame() {
 
 
 async function startGame() {
+    //start the game
     let theGame = await getGame();
     theGame.isRunning = true;
     await theGame.save();
+
+    //initialize the player's deuce owes maps
+    let players = await Player.find();
+    let myMap={};
+    for(let pla of players){
+        myMap[pla.id] = 0;
+    }
+    for(let pla of players){
+        pla.deuceOwes=myMap;
+        await pla.save();
+    }
+
     theGame = await getGame();
     return theGame;
 }
-
 app.get(basePath + "game/start", (req, res) => {
     startGame()
         .then(game => res.json(game))
@@ -239,14 +264,14 @@ async function resetPlayers() {
         player.set({
             deuces: 0,
             rank: null,
-            isStillPlaying: true
+            isStillPlaying: true,
+            deuceOwes: {}
         });
         await player.save();
     }
     const updatedPlayers = await Player.find();
     return updatedPlayers;
 }
-
 app.get(basePath + "game/reset", (req, res) => {
     resetPlayers()
         .then(players => res.json(players))
@@ -322,6 +347,8 @@ app.get(basePath + "game/winnings", (req,res)=>{
 })
 
 async function deleteWinnings(){
+    const theGame = await getGame();
+    if(theGame.isRunning) throw Error("Cannot reset winnings while the game is running")
     let winnings = await Winning.find();
     for(let win of winnings){
         await Winning.deleteOne({_id: win.id});
