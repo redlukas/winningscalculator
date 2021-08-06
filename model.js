@@ -415,18 +415,20 @@ async function calculateEarnings() {
     }
     players = await Player.find();
 
-    //distribute the pot money to the other players
+    //distribute the pot set the pot entitlements from the other players
     const otherPlayers = players.length - 1;
-    const toTheOthers = game.bet / otherPlayers;
     for (let player of players) {
-        player.winnings.forEach((item, key) => {
-            if (key !== player.id && key !== "pot") {
-                const oldNumber = item;
-                const newNumber = oldNumber + toTheOthers;
-                player.winnings.set(key, newNumber)
-            }
-        })
-        await player.save();
+        if(player.winnings.get("pot")>0) {
+            player.winnings.forEach((item, key) => {
+                if (key !== player.id && key !== "pot") {
+                    const oldNumber = item;
+                    const entitlement = player.winnings.get("pot")/otherPlayers;
+                    const newNumber = oldNumber + entitlement;
+                    player.winnings.set(key, newNumber)
+                }
+            })
+            await player.save();
+        }
     }
     players = await Player.find();
 
@@ -446,6 +448,7 @@ async function calculateEarnings() {
                 otherPlayersCredit -= smallerNumber;
                 console.log("this players credit was set to ", thisPlayersCredit);
                 console.log("the other players credit was set to", otherPlayersCredit);
+                console.log("");
                 player.winnings.set(item[0], thisPlayersCredit);
                 otherPlayer.winnings.set(player.id, otherPlayersCredit);
                 await player.save();
