@@ -28,14 +28,12 @@ const playerSchema = new mongoose.Schema({
     rank: {type: Number, default: null},
     deuces: {type: Number, default: 0},
     isStillPlaying: {type: Boolean, default: true},
-    deuceOwes: {type:Map, of: Number}
+    winnings: {type:Map, of:Number, default:{}}
 });
 
 const winningsSchema = new mongoose.Schema({
     rank: Number,
-    winningsPercentage: Number,
-    winningsAmount: {type: Number, default: null},
-    player: {type: String, default: null}
+    winningsPercentage: Number
 
 })
 
@@ -171,16 +169,15 @@ async function addDeuce(id) {
 
     //increment the player's deuce count
     player.deuces++;
-    await player.save()
 
     //increment the other player's deuce owes
     const players = await Player.find()
     for(let pla of players){
         if(pla.isStillPlaying && pla.id!==id){
-            pla.deuceOwes.set(id, pla.deuceOwes.get(id)+1)
-            await pla.save();
+            player.winnings.set(pla.id, player.winnings.get(pla.id)+1)
         }
     }
+    await player.save()
 
 
     const playyers = await Player.find();
@@ -212,21 +209,27 @@ async function getGame() {
 
 
 async function startGame() {
+    //check if the winnings total matches
+    let winMatch = await checkWinningsTotal();
+    if(!winMatch) throw Error("Winnings total does not match")
+
     //start the game
     let theGame = await getGame();
     theGame.isRunning = true;
     await theGame.save();
 
-    //initialize the player's deuce owes maps
+    //initialize the player's winnings maps
     let players = await Player.find();
     let myMap={};
     for(let pla of players){
         myMap[pla.id] = 0;
     }
     for(let pla of players){
-        pla.deuceOwes=myMap;
+        pla.winnings=myMap;
         await pla.save();
     }
+
+
 
     theGame = await getGame();
     return theGame;
@@ -359,6 +362,58 @@ async function deleteWinnings(){
 app.get(basePath + "game/winnings/reset", (req,res)=>{
     deleteWinnings()
         .then(winnings=>res.json(winnings))
+        .catch(err => res.status(400).send(err.toString()))
+})
+
+async function checkWinningsTotal(){
+    const winnings = await Winning.find();
+    const players = await Player.find();
+    let total = 0;
+    for(let win of winnings){
+        total+=win.winningsPercentage;
+    }
+    total=total/100;
+    const result = total===players.length
+    if(!result){
+        toast.error("Winnings do not match with number of players!")
+    }
+    return result
+}
+
+async function calculateEarnings(){
+    const winnings = await Winning.find();
+    const players = await Player.find();
+    const game = await getGame();
+
+    //check if game is still running
+    if(game.isRunning) throw Error("cannot calculate earnings while game is still running")
+
+    //check if all players have been assigned a rank
+    for(let pla of players){
+        if(!pla.rank) throw Error("All players need to have a rank assigned to calculate the earnings")
+    }
+
+    //calculate the winnings per rank
+    for(let pla of players){
+        const rank = pla.rank;
+        for(let rk of winnings){
+            if(rk.rank === rank){
+                const factor = rk.winningsPercentage/100;
+                const win = game.bet*factor;
+                pla.winnings.set("pot", win);
+
+            }
+        }
+        if(!pla.winnings.get("pot")) pla.winnings.set("pot", 0)
+        await pla.save();
+    }
+
+
+    return players;
+}
+app.get(basePath + "game/earnings", (req,res)=>{
+    calculateEarnings()
+        .then(earnings=>res.json(earnings))
         .catch(err => res.status(400).send(err.toString()))
 })
 
