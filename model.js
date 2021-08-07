@@ -7,7 +7,7 @@ const bodyParser = require("body-parser");
 const cors = require("cors");
 
 // SET UP EXPRESS
-const PORT = process.env.PORT || 8888;
+const PORT = 8888;
 const HOST = '0.0.0.0';
 const app = express();
 const basePath = "/api/";
@@ -461,10 +461,25 @@ async function calculateEarnings() {
     await game.save();
     return players;
 }
-
-
 app.get(basePath + "game/earnings", (req, res) => {
     calculateEarnings()
+        .then(earnings => res.json(earnings))
+        .catch(err => res.status(400).send(err.toString()))
+})
+
+async function craftMasterObject(){
+    const game = await getGame();
+    const players = await Player.find();
+    const winnings = await Winning.find();
+    const result = {
+        game: game,
+        players: players,
+        winnings: winnings
+    };
+    return result;
+}
+app.get(basePath + "game", (req,res)=>{
+    craftMasterObject()
         .then(earnings => res.json(earnings))
         .catch(err => res.status(400).send(err.toString()))
 })
