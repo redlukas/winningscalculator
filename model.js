@@ -86,8 +86,8 @@ async function addPlayer(playerName) {
         name: playerName
     });
     await newPlayer.save();
-    const players = await Player.find();
-    return players;
+    const result  = await craftMasterObject();
+    return result;
 }
 
 app.post(basePath + "players", jsonParser, (req, res) => {
@@ -108,8 +108,8 @@ async function handleDelete(id) {
         throw Error("Player not found");
     }
     await Player.deleteOne({_id: id});
-    const players = await Player.find();
-    return players;
+    const result  = await craftMasterObject();
+    return result;
 }
 
 app.delete(basePath + "players/:id", (req, res) => {
@@ -146,8 +146,8 @@ async function togglePlayingStatus(id) {
         player.rank = null;
     }
     await player.save()
-    const players = await Player.find();
-    return players;
+    const result  = await craftMasterObject();
+    return result;
 }
 
 app.get(basePath + "players/togglePlaying/:id", (req, res) => {
@@ -181,8 +181,8 @@ async function addDeuce(id) {
     await player.save()
 
 
-    const playyers = await Player.find();
-    return playyers;
+    const result  = await craftMasterObject();
+    return result;
 }
 
 app.get(basePath + "players/deuce/:id", (req, res) => {
@@ -230,9 +230,8 @@ async function startGame() {
         await pla.save();
     }
 
-
-    theGame = await getGame();
-    return theGame;
+    const result  = await craftMasterObject();
+    return result;
 }
 
 app.get(basePath + "game/start", (req, res) => {
@@ -248,8 +247,9 @@ async function endGame() {
     let theGame = await getGame();
     theGame.isRunning = false;
     await theGame.save();
-    theGame = await getGame();
-    return theGame;
+
+    const result  = await craftMasterObject();
+    return result;
 }
 
 app.get(basePath + "game/end", (req, res) => {
@@ -277,8 +277,8 @@ async function resetPlayers() {
     game.moneyDistributed=false;
     await game.save();
 
-    const updatedPlayers = await Player.find();
-    return updatedPlayers;
+    const result  = await craftMasterObject();
+    return result;
 }
 
 app.get(basePath + "game/reset", (req, res) => {
@@ -306,13 +306,16 @@ async function setBet(bet) {
     }
     theGame.bet = bet;
     await theGame.save();
-    theGame = await getGame();
-    return theGame;
+
+    const result  = await craftMasterObject();
+    return result;
 }
 
 app.post(basePath + "game/bet", jsonParser, (req, res) => {
+    console.log("input: ", req.body)
     const {error, value} = postBet.validate(req.body);
     if (error) {
+        console.log("error: ", error);
         return res.status(400).send(error.details[0].message)
     } else {
         setBet(value.bet)
@@ -335,8 +338,9 @@ async function createWinning(rank, percentage) {
         winningsPercentage: percentage
     })
     await newWinning.save();
-    const newWinnings = Winning.find();
-    return newWinnings;
+
+    const result  = await craftMasterObject();
+    return result;
 }
 
 app.post(basePath + "game/winnings", jsonParser, (req, res) => {
@@ -363,8 +367,9 @@ async function deleteWinnings() {
     for (let win of winnings) {
         await Winning.deleteOne({_id: win.id});
     }
-    winnings = await Winning.find();
-    return winnings;
+
+    const result  = await craftMasterObject();
+    return result;
 }
 
 app.get(basePath + "game/winnings/reset", (req, res) => {
@@ -392,6 +397,7 @@ async function calculateEarnings() {
     const winnings = await Winning.find();
     let players = await Player.find();
     const game = await getGame();
+    const master = await craftMasterObject();
 
     //check if game is still running
     if (game.isRunning) throw Error("cannot calculate earnings while game is still running")
@@ -401,7 +407,7 @@ async function calculateEarnings() {
         if (!pla.rank) throw Error("All players need to have a rank assigned to calculate the earnings")
     }
 
-    if (game.moneyDistributed) return players;
+    if (game.moneyDistributed) return master;
 
     //calculate the winnings per rank
     for (let pla of players) {
@@ -459,7 +465,8 @@ async function calculateEarnings() {
 
     game.moneyDistributed=true;
     await game.save();
-    return players;
+    const result  = await craftMasterObject();
+    return result;
 }
 app.get(basePath + "game/earnings", (req, res) => {
     calculateEarnings()
