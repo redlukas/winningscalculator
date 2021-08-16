@@ -58,6 +58,9 @@ const postWinning = Joi.object({
     rank: Joi.number().integer().positive(),
     percentage: Joi.number().integer().greater(-1)
 })
+const postDeuce = Joi.object({
+    amount: Joi.number().integer().positive()
+})
 
 
 //REST CALLS
@@ -489,6 +492,20 @@ app.get(basePath + "game", (req,res)=>{
     craftMasterObject()
         .then(earnings => res.json(earnings))
         .catch(err => res.status(400).send(err.toString()))
+})
+
+async function setDeuceEarnings(amount){
+
+}
+app.post(basePath + "game/deuceearnings", jsonParser, (req, res) => {
+    const {error, value} = postDeuce.validate(req.body);
+    if (error) {
+        return res.status(400).send(error.details[0].message)
+    } else {
+        createWinning(value.rank, value.percentage)
+            .then(winnings => res.json(winnings))
+            .catch(err => res.status(400).send(err.toString()))
+    }
 })
 
 //START EXPRESS
