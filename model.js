@@ -40,7 +40,8 @@ const winningsSchema = new mongoose.Schema({
 const gameSchema = new mongoose.Schema({
     isRunning: {type: Boolean, default: false},
     bet: {type: Number, default: 5},
-    moneyDistributed: {type: Boolean, default: false}
+    moneyDistributed: {type: Boolean, default: false},
+    deuceEarnings: {type: Number, default: 1}
 })
 
 const Player = mongoose.model('Player', playerSchema);
@@ -160,6 +161,7 @@ app.get(basePath + "players/togglePlaying/:id", (req, res) => {
 });
 
 async function addDeuce(id) {
+    const game = await getGame();
     //check if the player exists
     let player = await Player.findById(id);
     if (!player) throw Error("Player not found");
@@ -178,7 +180,7 @@ async function addDeuce(id) {
     const players = await Player.find()
     for (let pla of players) {
         if (pla.isStillPlaying && pla.id !== id) {
-            player.winnings.set(pla.id, player.winnings.get(pla.id) + 1)
+            player.winnings.set(pla.id, player.winnings.get(pla.id) + game.deuceEarnings)
         }
     }
     await player.save()
@@ -315,10 +317,8 @@ async function setBet(bet) {
 }
 
 app.post(basePath + "game/bet", jsonParser, (req, res) => {
-    console.log("input: ", req.body)
     const {error, value} = postBet.validate(req.body);
     if (error) {
-        console.log("error: ", error);
         return res.status(400).send(error.details[0].message)
     } else {
         setBet(value.bet)
@@ -428,7 +428,7 @@ async function calculateEarnings() {
     }
     players = await Player.find();
 
-    //distribute the pot set the pot entitlements from the other players
+    //distribute the pot entitlements from the other players
     const otherPlayers = players.length - 1;
     for (let player of players) {
         if(player.winnings.get("pot")>0) {
@@ -463,7 +463,6 @@ async function calculateEarnings() {
 
         }
     }
-    players = await Player.find();
 
 
     game.moneyDistributed=true;
@@ -495,15 +494,19 @@ app.get(basePath + "game", (req,res)=>{
 })
 
 async function setDeuceEarnings(amount){
-
+    let game = await getGame();
+    game.deuceEarnings = amount;
+    await game.save();
+    const result = await craftMasterObject();
+    return result;
 }
 app.post(basePath + "game/deuceearnings", jsonParser, (req, res) => {
     const {error, value} = postDeuce.validate(req.body);
     if (error) {
         return res.status(400).send(error.details[0].message)
     } else {
-        createWinning(value.rank, value.percentage)
-            .then(winnings => res.json(winnings))
+        setDeuceEarnings(value.amount)
+            .then(result => res.json(result))
             .catch(err => res.status(400).send(err.toString()))
     }
 })
