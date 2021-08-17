@@ -41,7 +41,8 @@ const gameSchema = new mongoose.Schema({
     isRunning: {type: Boolean, default: false},
     bet: {type: Number, default: 5},
     moneyDistributed: {type: Boolean, default: false},
-    deuceEarnings: {type: Number, default: 1}
+    deuceEarnings: {type: Number, default: 1},
+    IP: {type: String, default: process.env.IP}
 })
 
 const Player = mongoose.model('Player', playerSchema);
