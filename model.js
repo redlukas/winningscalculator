@@ -218,6 +218,10 @@ async function getGame() {
 
 
 async function startGame() {
+    //check if we have at least two players
+    let players = await Player.find();
+    if(players.length<=1) throw Error("Cannot start a game without at least two players")
+
     //check if the winnings total matches
     let winMatch = await checkWinningsTotal();
     if (!winMatch) throw Error("Winnings total does not match")
@@ -228,7 +232,6 @@ async function startGame() {
     await theGame.save();
 
     //initialize the player's winnings maps
-    let players = await Player.find();
     let myMap = {};
     for (let pla of players) {
         myMap[pla.id] = 0;
