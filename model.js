@@ -28,7 +28,9 @@ const playerSchema = new mongoose.Schema({
     rank: {type: Number, default: null},
     deuces: {type: Number, default: 0},
     isStillPlaying: {type: Boolean, default: true},
-    winnings: {type: Map, of: Number, default: {}}
+    winnings: {type: Map, of: Number, default: {}},
+    entitledTo: Number,
+    assignedTo: Number
 });
 
 const winningsSchema = new mongoose.Schema({
@@ -49,7 +51,7 @@ const Player = mongoose.model('Player', playerSchema);
 const Winning = mongoose.model('Winning', winningsSchema);
 const Game = mongoose.model("Game", gameSchema);
 
-//Joi schemas
+//JOI SCHEMAS
 const postPlayer = Joi.object({
     name: Joi.string().required().max(15).truncate().pattern(/^\s*\w+(?:[^\w,]+\w+)*[^,\w]*$/)
 });
@@ -58,7 +60,7 @@ const postBet = Joi.object({
 })
 const postWinning = Joi.object({
     rank: Joi.number().integer().positive(),
-    percentage: Joi.number().integer().greater(-1)
+    percentage: Joi.number().integer().greater(-1).multiple(100)
 })
 const postDeuce = Joi.object({
     amount: Joi.number().integer().positive()
@@ -71,6 +73,9 @@ app.get(basePath + "players", (req, res) => {
         .then(players => res.json(players))
 });
 
+
+
+
 app.get(basePath + "players/:id", (req, res) => {
     Player.findById(req.params.id)
         .then(player => res.json(player))
@@ -79,6 +84,9 @@ app.get(basePath + "players/:id", (req, res) => {
             return res.status(404).send("Player not found")
         })
 });
+
+
+
 
 
 async function addPlayer(playerName) {
@@ -93,7 +101,6 @@ async function addPlayer(playerName) {
     const result  = await craftMasterObject();
     return result;
 }
-
 app.post(basePath + "players", jsonParser, (req, res) => {
     const {error, value} = postPlayer.validate(req.body);
     if (error) {
@@ -106,6 +113,8 @@ app.post(basePath + "players", jsonParser, (req, res) => {
 });
 
 
+
+
 async function handleDelete(id) {
     const player = await Player.findById(id);
     if (!player) {
@@ -115,7 +124,6 @@ async function handleDelete(id) {
     const result  = await craftMasterObject();
     return result;
 }
-
 app.delete(basePath + "players/:id", (req, res) => {
     handleDelete(req.params.id)
         .then(players => res.json(players))
@@ -124,6 +132,8 @@ app.delete(basePath + "players/:id", (req, res) => {
             res.status(400).send(err.toString())
         })
 })
+
+
 
 
 async function togglePlayingStatus(id) {
@@ -153,12 +163,14 @@ async function togglePlayingStatus(id) {
     const result  = await craftMasterObject();
     return result;
 }
-
 app.get(basePath + "players/togglePlaying/:id", (req, res) => {
     togglePlayingStatus(req.params.id)
         .then(players => res.json(players))
         .catch(err => res.status(400).send(err.toString()))
 });
+
+
+
 
 async function addDeuce(id) {
     const game = await getGame();
@@ -189,7 +201,6 @@ async function addDeuce(id) {
     const result  = await craftMasterObject();
     return result;
 }
-
 app.get(basePath + "players/deuce/:id", (req, res) => {
     addDeuce(req.params.id)
         .then(players => res.json(players))
@@ -212,6 +223,8 @@ async function getGame() {
     }
     return theGame[0];
 }
+
+
 
 
 async function startGame() {
@@ -238,7 +251,6 @@ async function startGame() {
     const result  = await craftMasterObject();
     return result;
 }
-
 app.get(basePath + "game/start", (req, res) => {
     startGame()
         .then(game => res.json(game))
@@ -248,6 +260,9 @@ app.get(basePath + "game/start", (req, res) => {
         })
 })
 
+
+
+
 async function endGame() {
     let theGame = await getGame();
     theGame.isRunning = false;
@@ -256,7 +271,6 @@ async function endGame() {
     const result  = await craftMasterObject();
     return result;
 }
-
 app.get(basePath + "game/end", (req, res) => {
     endGame()
         .then(game => res.json(game))
@@ -285,7 +299,6 @@ async function resetPlayers() {
     const result  = await craftMasterObject();
     return result;
 }
-
 app.get(basePath + "game/reset", (req, res) => {
     resetPlayers()
         .then(players => res.json(players))
@@ -297,11 +310,8 @@ app.get(basePath + "game/reset", (req, res) => {
 
 
 app.get(basePath + "game/state", (req, res) => {
-    Game.find()
-        .then(game => {
-            let theGame = game[0];
-            res.json(theGame);
-        })
+    getGame()
+        .then(game => res.json(game))
 })
 
 async function setBet(bet) {
@@ -315,7 +325,6 @@ async function setBet(bet) {
     const result  = await craftMasterObject();
     return result;
 }
-
 app.post(basePath + "game/bet", jsonParser, (req, res) => {
     const {error, value} = postBet.validate(req.body);
     if (error) {
@@ -345,7 +354,6 @@ async function createWinning(rank, percentage) {
     const result  = await craftMasterObject();
     return result;
 }
-
 app.post(basePath + "game/winnings", jsonParser, (req, res) => {
     const {error, value} = postWinning.validate(req.body);
     if (error) {
@@ -374,7 +382,6 @@ async function deleteWinnings() {
     const result  = await craftMasterObject();
     return result;
 }
-
 app.get(basePath + "game/winnings/reset", (req, res) => {
     deleteWinnings()
         .then(winnings => res.json(winnings))
@@ -438,15 +445,31 @@ async function calculateEarnings() {
 
 
     //distribute the pot entitlements from the other players
-    const otherPlayers = players.length - 1;
+    let losingPlayers = 0;
+    for (let pla of players){
+        if(pla.winnings.get("pot")<0){
+            losingPlayers++;
+        }
+    }
+    console.log("losingPlayers is", losingPlayers);
     for (let player of players) {
         if(player.winnings.get("pot")>0) {
             player.winnings.forEach((item, key) => {
                 if (key !== player.id && key !== "pot") {
-                    const oldNumber = item;
-                    const entitlement = player.winnings.get("pot")/otherPlayers;
-                    const newNumber = oldNumber + entitlement;
-                    player.winnings.set(key, newNumber)
+                    console.log("processing player ", key);
+                    const plaaaa = players.find(pla=>pla["id"]===key);
+                    console.log("plaaa is ", plaaaa);
+                    const hisPot = plaaaa.winnings.get("pot");
+                    console.log("his pot is", hisPot);
+                    if(hisPot<0) {
+                        const oldNumber = item;
+                        console.log("old number is", oldNumber);
+                        const entitlement = player.winnings.get("pot") / losingPlayers;
+                        console.log("entitlement is", entitlement);
+                        const newNumber = oldNumber + entitlement;
+                        console.log("new number is", newNumber);
+                        player.winnings.set(key, newNumber)
+                    }
                 }
             })
             await player.save();
@@ -482,7 +505,10 @@ async function calculateEarnings() {
 app.get(basePath + "game/earnings", (req, res) => {
     calculateEarnings()
         .then(earnings => res.json(earnings))
-        .catch(err => res.status(400).send(err.toString()))
+        .catch(err => {
+            console.log(err);
+            res.status(400).send(err.toString());
+        })
 })
 
 async function craftMasterObject(){
@@ -529,7 +555,7 @@ async function scrubDB(){
         console.log(err);
     }
 }
-app.get(basePath+"db/scrub", (req,res)=>{
+app.get(basePath+"db/scrub/9dsNRiVgu4QEc43MNq1SJAxvdg3dI", (req,res)=>{
     scrubDB()
         .then(earnings => res.json(earnings))
         .catch(err => res.status(400).send(err.toString()))
