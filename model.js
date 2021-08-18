@@ -43,8 +43,7 @@ const gameSchema = new mongoose.Schema({
     isRunning: {type: Boolean, default: false},
     bet: {type: Number, default: 5},
     moneyDistributed: {type: Boolean, default: false},
-    deuceEarnings: {type: Number, default: 1},
-    IP: {type: String, default: process.env.IP}
+    deuceEarnings: {type: Number, default: 1}
 })
 
 const Player = mongoose.model('Player', playerSchema);
@@ -409,15 +408,19 @@ async function calculateEarnings() {
     const game = await getGame();
     const master = await craftMasterObject();
 
+    if (game.moneyDistributed) return master;
+
     //check if game is still running
     if (game.isRunning) throw Error("cannot calculate earnings while game is still running")
 
     //check if all players have been assigned a rank
     for (let pla of players) {
         if (!pla.rank) throw Error("All players need to have a rank assigned to calculate the earnings")
+        else{
+            pla.assignedTo=0;
+            pla.entitledTo=winnings.find(win=>win.rank===pla.rank)?winnings.find(win=>win.rank===pla.rank).winningsPercentage-100:-100;
+        }
     }
-
-    if (game.moneyDistributed) return master;
 
     //calculate the winnings per rank
     for (let pla of players) {
@@ -445,34 +448,27 @@ async function calculateEarnings() {
 
 
     //distribute the pot entitlements from the other players
-    let losingPlayers = 0;
-    for (let pla of players){
-        if(pla.winnings.get("pot")<0){
-            losingPlayers++;
-        }
-    }
-    console.log("losingPlayers is", losingPlayers);
-    for (let player of players) {
-        if(player.winnings.get("pot")>0) {
-            player.winnings.forEach((item, key) => {
-                if (key !== player.id && key !== "pot") {
-                    console.log("processing player ", key);
-                    const plaaaa = players.find(pla=>pla["id"]===key);
-                    console.log("plaaa is ", plaaaa);
-                    const hisPot = plaaaa.winnings.get("pot");
-                    console.log("his pot is", hisPot);
-                    if(hisPot<0) {
-                        const oldNumber = item;
-                        console.log("old number is", oldNumber);
-                        const entitlement = player.winnings.get("pot") / losingPlayers;
-                        console.log("entitlement is", entitlement);
-                        const newNumber = oldNumber + entitlement;
-                        console.log("new number is", newNumber);
-                        player.winnings.set(key, newNumber)
-                    }
-                }
-            })
-            await player.save();
+    for(let pla of players){//for every player in the list
+        console.log("evaluating player ", pla.name);
+        if(pla.winnings.get("pot")<0){ //find a player who owes money
+            console.log("he owes money");
+            while(pla.entitledTo<pla.assignedTo){//while he has not been assigned all the debt he owes
+                console.log("he still owes money");
+                console.log("pot:", pla.winnings.get("pot"));
+                console.log("entAss", pla.entitledTo<pla.assignedTo);
+                const recipient = await players.find(player=>player.winnings.get("pot")>0&&player.entitledTo>player.assignedTo);//find any player who is entitled to more than he has
+                console.log("giving money to", recipient.name);
+                console.log("he has already been allocated", recipient.assignedTo);
+                console.log("his winnings are", recipient.winnings);
+                recipient.winnings.set(pla.id, recipient.winnings.get(pla.id)+game.bet);//increase the amount the owing player pays the recipient by one bet
+                console.log("the recipient now gets: ", recipient.winnings);
+                recipient.assignedTo=recipient.assignedTo+100;//set the amount the recipient has been assigned
+                console.log("his allocation is now ", recipient.assignedTo);
+                await recipient.save()//save the recipient
+                pla.assignedTo = pla.assignedTo-100;//set the amount the donor has been assigned
+                console.log("the player has now been allocated", pla.assignedTo);
+            }
+            await pla.save();//save the donor
         }
     }
     players = await Player.find();
