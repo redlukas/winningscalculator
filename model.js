@@ -18,7 +18,7 @@ app.use(cors({
 
 
 //SET UP MONGOOSE
-mongoose.connect('mongodb://localhost/winnings', { useNewUrlParser: true, useUnifiedTopology: true })
+mongoose.connect('mongodb://localhost/winnings', {useNewUrlParser: true, useUnifiedTopology: true})
     .then(() => console.log("connected to mongodb"))
     .catch(err => console.log("Connection to mongodb failed", err));
 
@@ -486,7 +486,7 @@ async function calculateEarnings() {
             }
         }
     }
-    const settleAmount = game.bet/100*settlePercentage;
+    const settleAmount = game.bet / 100 * settlePercentage;
 
     //distribute the pot entitlements from the other players
     for (let pla of players) {//for every player in the list
@@ -539,9 +539,27 @@ app.get(basePath + "game/earnings", (req, res) => {
 })
 
 async function craftMasterObject() {
-    const game = await getGame();
-    const players = await Player.find();
-    const winnings = await Winning.find();
+    const oggame = await getGame();
+    const ogplayers = await Player.find();
+    const ogwinnings = await Winning.find();
+
+    const {isRunning, bet, deuceEarnings} = oggame;
+    const game = {bet, deuceEarnings, isRunning};
+
+    let players = [];
+    for(let pla of ogplayers){
+        const {rank, deuces, isStillPlaying, winnings, id, name} = pla;
+        const player = {name, rank, id, deuces, isStillPlaying, winnings}
+        players.push(player);
+    }
+
+    let winnings = [];
+    for(let win of ogwinnings){
+        const {rank, winningsPercentage} = win;
+        const winning = {rank, winningsPercentage};
+        winnings.push(winning);
+    }
+
     const result = {
         game: game,
         players: players,
