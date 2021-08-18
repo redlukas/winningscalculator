@@ -18,7 +18,7 @@ app.use(cors({
 
 
 //SET UP MONGOOSE
-mongoose.connect('mongodb://localhost/winnings')
+mongoose.connect('mongodb://localhost/winnings', { useNewUrlParser: true, useUnifiedTopology: true })
     .then(() => console.log("connected to mongodb"))
     .catch(err => console.log("Connection to mongodb failed", err));
 
