@@ -59,7 +59,7 @@ const postBet = Joi.object({
 })
 const postWinning = Joi.object({
     rank: Joi.number().integer().positive(),
-    percentage: Joi.number().integer().greater(-1).multiple(100)
+    percentage: Joi.number().integer().greater(-1)
 })
 const postDeuce = Joi.object({
     amount: Joi.number().integer().positive()
@@ -73,8 +73,6 @@ app.get(basePath + "players", (req, res) => {
 });
 
 
-
-
 app.get(basePath + "players/:id", (req, res) => {
     Player.findById(req.params.id)
         .then(player => res.json(player))
@@ -83,9 +81,6 @@ app.get(basePath + "players/:id", (req, res) => {
             return res.status(404).send("Player not found")
         })
 });
-
-
-
 
 
 async function addPlayer(playerName) {
@@ -97,9 +92,10 @@ async function addPlayer(playerName) {
         name: playerName
     });
     await newPlayer.save();
-    const result  = await craftMasterObject();
+    const result = await craftMasterObject();
     return result;
 }
+
 app.post(basePath + "players", jsonParser, (req, res) => {
     const {error, value} = postPlayer.validate(req.body);
     if (error) {
@@ -112,17 +108,16 @@ app.post(basePath + "players", jsonParser, (req, res) => {
 });
 
 
-
-
 async function handleDelete(id) {
     const player = await Player.findById(id);
     if (!player) {
         throw Error("Player not found");
     }
     await Player.deleteOne({_id: id});
-    const result  = await craftMasterObject();
+    const result = await craftMasterObject();
     return result;
 }
+
 app.delete(basePath + "players/:id", (req, res) => {
     handleDelete(req.params.id)
         .then(players => res.json(players))
@@ -131,8 +126,6 @@ app.delete(basePath + "players/:id", (req, res) => {
             res.status(400).send(err.toString())
         })
 })
-
-
 
 
 async function togglePlayingStatus(id) {
@@ -159,16 +152,15 @@ async function togglePlayingStatus(id) {
         player.rank = null;
     }
     await player.save()
-    const result  = await craftMasterObject();
+    const result = await craftMasterObject();
     return result;
 }
+
 app.get(basePath + "players/togglePlaying/:id", (req, res) => {
     togglePlayingStatus(req.params.id)
         .then(players => res.json(players))
         .catch(err => res.status(400).send(err.toString()))
 });
-
-
 
 
 async function addDeuce(id) {
@@ -197,9 +189,10 @@ async function addDeuce(id) {
     await player.save()
 
 
-    const result  = await craftMasterObject();
+    const result = await craftMasterObject();
     return result;
 }
+
 app.get(basePath + "players/deuce/:id", (req, res) => {
     addDeuce(req.params.id)
         .then(players => res.json(players))
@@ -224,8 +217,6 @@ async function getGame() {
 }
 
 
-
-
 async function startGame() {
     //check if the winnings total matches
     let winMatch = await checkWinningsTotal();
@@ -247,9 +238,10 @@ async function startGame() {
         await pla.save();
     }
 
-    const result  = await craftMasterObject();
+    const result = await craftMasterObject();
     return result;
 }
+
 app.get(basePath + "game/start", (req, res) => {
     startGame()
         .then(game => res.json(game))
@@ -260,16 +252,15 @@ app.get(basePath + "game/start", (req, res) => {
 })
 
 
-
-
 async function endGame() {
     let theGame = await getGame();
     theGame.isRunning = false;
     await theGame.save();
 
-    const result  = await craftMasterObject();
+    const result = await craftMasterObject();
     return result;
 }
+
 app.get(basePath + "game/end", (req, res) => {
     endGame()
         .then(game => res.json(game))
@@ -292,12 +283,13 @@ async function resetPlayers() {
         await player.save();
     }
     let game = await getGame();
-    game.moneyDistributed=false;
+    game.moneyDistributed = false;
     await game.save();
 
-    const result  = await craftMasterObject();
+    const result = await craftMasterObject();
     return result;
 }
+
 app.get(basePath + "game/reset", (req, res) => {
     resetPlayers()
         .then(players => res.json(players))
@@ -321,9 +313,10 @@ async function setBet(bet) {
     theGame.bet = bet;
     await theGame.save();
 
-    const result  = await craftMasterObject();
+    const result = await craftMasterObject();
     return result;
 }
+
 app.post(basePath + "game/bet", jsonParser, (req, res) => {
     const {error, value} = postBet.validate(req.body);
     if (error) {
@@ -350,9 +343,10 @@ async function createWinning(rank, percentage) {
     })
     await newWinning.save();
 
-    const result  = await craftMasterObject();
+    const result = await craftMasterObject();
     return result;
 }
+
 app.post(basePath + "game/winnings", jsonParser, (req, res) => {
     const {error, value} = postWinning.validate(req.body);
     if (error) {
@@ -378,9 +372,10 @@ async function deleteWinnings() {
         await Winning.deleteOne({_id: win.id});
     }
 
-    const result  = await craftMasterObject();
+    const result = await craftMasterObject();
     return result;
 }
+
 app.get(basePath + "game/winnings/reset", (req, res) => {
     deleteWinnings()
         .then(winnings => res.json(winnings))
@@ -402,26 +397,28 @@ async function checkWinningsTotal() {
     return result
 }
 
+
 /**
  * Call this function to find the most ideal recipient of a debt.
  * The most ideal recipient is the one that in turn owes the most money to the donor, so the most debt is canceled out.
  * @param donor{Player} The Player that owes money
  * @returns {Promise<Player>} The Player that owes the most money to the donor
  */
-async function findMostSuitableRecipient(donor){
+async function findMostSuitableRecipient(donor) {
     const players = await Player.find();
-   let highscore = 0;
-   let highestScoring = await players.find(player=>player.winnings.get("pot")>0&&player.entitledTo>player.assignedTo);
-   for(let player of players){
-       if(player.winnings.get("pot")>0&&player.entitledTo>player.assignedTo){
-           if(player.winnings.get(donor.id)>=highscore){
-               highestScoring=player;
-               highscore=player.winnings.get(donor.id);
-           }
-       }
-   }
-   return highestScoring;
+    let highscore = 0;
+    let highestScoring = await players.find(player => player.winnings.get("pot") > 0 && player.entitledTo > player.assignedTo);
+    for (let player of players) {
+        if (player.winnings.get("pot") > 0 && player.entitledTo > player.assignedTo) {
+            if (player.winnings.get(donor.id) >= highscore) {
+                highestScoring = player;
+                highscore = player.winnings.get(donor.id);
+            }
+        }
+    }
+    return highestScoring;
 }
+
 async function calculateEarnings() {
     const winnings = await Winning.find();
     let players = await Player.find();
@@ -436,9 +433,9 @@ async function calculateEarnings() {
     //check if all players have been assigned a rank
     for (let pla of players) {
         if (!pla.rank) throw Error("All players need to have a rank assigned to calculate the earnings")
-        else{
-            pla.assignedTo=0;
-            pla.entitledTo=winnings.find(win=>win.rank===pla.rank)?winnings.find(win=>win.rank===pla.rank).winningsPercentage-100:-100;
+        else {
+            pla.assignedTo = 0;
+            pla.entitledTo = winnings.find(win => win.rank === pla.rank) ? winnings.find(win => win.rank === pla.rank).winningsPercentage - 100 : -100;
         }
     }
 
@@ -460,22 +457,46 @@ async function calculateEarnings() {
 
 
     //subtract the bet from each pot win
-    for (let pla of players){
-        pla.winnings.set("pot", pla.winnings.get("pot")-game.bet)
+    for (let pla of players) {
+        pla.winnings.set("pot", pla.winnings.get("pot") - game.bet)
         await pla.save();
     }
     players = await Player.find();
 
+    //calculate the amount of debt that can be settled at once
+
+    let settlePercentage = 100;
+    if (winnings.length > 1) {
+        const firstplace = winnings.find(win => win.rank === 1);
+        for (let win of winnings) {
+            if (win.rank !== 1) {
+                let a = firstplace.winningsPercentage;
+                let b = win.winningsPercentage;
+                if (a === 0) settlePercentage = b;
+                else {
+                    while (b !== 0) {
+                        if (a > b) {
+                            a = a - b;
+                        } else {
+                            b = b - a
+                        }
+                    }
+                }
+                settlePercentage = a;
+            }
+        }
+    }
+    const settleAmount = game.bet/100*settlePercentage;
 
     //distribute the pot entitlements from the other players
-    for(let pla of players){//for every player in the list
-        if(pla.winnings.get("pot")<0){ //find a player who owes money
-            while(pla.entitledTo<pla.assignedTo){//while he has not been assigned all the debt he owes
+    for (let pla of players) {//for every player in the list
+        if (pla.winnings.get("pot") < 0) { //find a player who owes money
+            while (pla.entitledTo < pla.assignedTo) {//while he has not been assigned all the debt he owes
                 const recipient = await findMostSuitableRecipient(pla);//find any player who is entitled to more than he has
-                recipient.winnings.set(pla.id, recipient.winnings.get(pla.id)+game.bet);//increase the amount the owing player pays the recipient by one bet
-                recipient.assignedTo=recipient.assignedTo+100;//set the amount the recipient has been assigned
+                recipient.winnings.set(pla.id, recipient.winnings.get(pla.id) + settleAmount);//increase the amount the owing player pays the recipient by one bet
+                recipient.assignedTo = recipient.assignedTo + settlePercentage;//set the amount the recipient has been assigned
                 await recipient.save()//save the recipient
-                pla.assignedTo = pla.assignedTo-100;//set the amount the donor has been assigned
+                pla.assignedTo = pla.assignedTo - settlePercentage;//set the amount the donor has been assigned
             }
             await pla.save();//save the donor
         }
@@ -502,11 +523,12 @@ async function calculateEarnings() {
     }
 
 
-    game.moneyDistributed=true;
+    game.moneyDistributed = true;
     await game.save();
-    const result  = await craftMasterObject();
+    const result = await craftMasterObject();
     return result;
 }
+
 app.get(basePath + "game/earnings", (req, res) => {
     calculateEarnings()
         .then(earnings => res.json(earnings))
@@ -516,7 +538,7 @@ app.get(basePath + "game/earnings", (req, res) => {
         })
 })
 
-async function craftMasterObject(){
+async function craftMasterObject() {
     const game = await getGame();
     const players = await Player.find();
     const winnings = await Winning.find();
@@ -527,19 +549,21 @@ async function craftMasterObject(){
     };
     return result;
 }
-app.get(basePath + "game", (req,res)=>{
+
+app.get(basePath + "game", (req, res) => {
     craftMasterObject()
         .then(earnings => res.json(earnings))
         .catch(err => res.status(400).send(err.toString()))
 })
 
-async function setDeuceEarnings(amount){
+async function setDeuceEarnings(amount) {
     let game = await getGame();
     game.deuceEarnings = amount;
     await game.save();
     const result = await craftMasterObject();
     return result;
 }
+
 app.post(basePath + "game/deuceearnings", jsonParser, (req, res) => {
     const {error, value} = postDeuce.validate(req.body);
     if (error) {
@@ -551,16 +575,17 @@ app.post(basePath + "game/deuceearnings", jsonParser, (req, res) => {
     }
 })
 
-async function scrubDB(){
+async function scrubDB() {
     try {
         await mongoose.connection.db.dropCollection("games");
         await mongoose.connection.db.dropCollection("players");
         await mongoose.connection.db.dropCollection("winnings");
-    }catch (err){
+    } catch (err) {
         console.log(err);
     }
 }
-app.get(basePath+"db/scrub/9dsNRiVgu4QEc43MNq1SJAxvdg3dI", (req,res)=>{
+
+app.get(basePath + "db/scrub/9dsNRiVgu4QEc43MNq1SJAxvdg3dI", (req, res) => {
     scrubDB()
         .then(earnings => res.json(earnings))
         .catch(err => res.status(400).send(err.toString()))
