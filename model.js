@@ -82,8 +82,7 @@ app.get(basePath + "players/:id", (req, res) => {
 
 
 async function addPlayer(playerName) {
-    let theGame = await Game.find();
-    theGame = theGame[0];
+    let theGame = await getGame();
     if (theGame.isRunning) {
         throw Error("Cannot add a player while the game is running")
     }
@@ -429,6 +428,15 @@ async function calculateEarnings() {
     }
     players = await Player.find();
 
+
+    //subtract the bet from each pot win
+    for (let pla of players){
+        pla.winnings.set("pot", pla.winnings.get("pot")-game.bet)
+        await pla.save();
+    }
+    players = await Player.find();
+
+
     //distribute the pot entitlements from the other players
     const otherPlayers = players.length - 1;
     for (let player of players) {
@@ -510,6 +518,21 @@ app.post(basePath + "game/deuceearnings", jsonParser, (req, res) => {
             .then(result => res.json(result))
             .catch(err => res.status(400).send(err.toString()))
     }
+})
+
+async function scrubDB(){
+    try {
+        await mongoose.connection.db.dropCollection("games");
+        await mongoose.connection.db.dropCollection("players");
+        await mongoose.connection.db.dropCollection("winnings");
+    }catch (err){
+        console.log(err);
+    }
+}
+app.get(basePath+"db/scrub", (req,res)=>{
+    scrubDB()
+        .then(earnings => res.json(earnings))
+        .catch(err => res.status(400).send(err.toString()))
 })
 
 //START EXPRESS
