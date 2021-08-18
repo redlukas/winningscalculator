@@ -402,6 +402,26 @@ async function checkWinningsTotal() {
     return result
 }
 
+/**
+ * Call this function to find the most ideal recipient of a debt.
+ * The most ideal recipient is the one that in turn owes the most money to the donor, so the most debt is canceled out.
+ * @param donor{Player} The Player that owes money
+ * @returns {Promise<Player>} The Player that owes the most money to the donor
+ */
+async function findMostSuitableRecipient(donor){
+    const players = await Player.find();
+   let highscore = 0;
+   let highestScoring = await players.find(player=>player.winnings.get("pot")>0&&player.entitledTo>player.assignedTo);
+   for(let player of players){
+       if(player.winnings.get("pot")>0&&player.entitledTo>player.assignedTo){
+           if(player.winnings.get(donor.id)>=highscore){
+               highestScoring=player;
+               highscore=player.winnings.get(donor.id);
+           }
+       }
+   }
+   return highestScoring;
+}
 async function calculateEarnings() {
     const winnings = await Winning.find();
     let players = await Player.find();
@@ -456,7 +476,7 @@ async function calculateEarnings() {
                 console.log("he still owes money");
                 console.log("pot:", pla.winnings.get("pot"));
                 console.log("entAss", pla.entitledTo<pla.assignedTo);
-                const recipient = await players.find(player=>player.winnings.get("pot")>0&&player.entitledTo>player.assignedTo);//find any player who is entitled to more than he has
+                const recipient = await findMostSuitableRecipient(pla);//find any player who is entitled to more than he has
                 console.log("giving money to", recipient.name);
                 console.log("he has already been allocated", recipient.assignedTo);
                 console.log("his winnings are", recipient.winnings);
