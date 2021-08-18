@@ -469,24 +469,13 @@ async function calculateEarnings() {
 
     //distribute the pot entitlements from the other players
     for(let pla of players){//for every player in the list
-        console.log("evaluating player ", pla.name);
         if(pla.winnings.get("pot")<0){ //find a player who owes money
-            console.log("he owes money");
             while(pla.entitledTo<pla.assignedTo){//while he has not been assigned all the debt he owes
-                console.log("he still owes money");
-                console.log("pot:", pla.winnings.get("pot"));
-                console.log("entAss", pla.entitledTo<pla.assignedTo);
                 const recipient = await findMostSuitableRecipient(pla);//find any player who is entitled to more than he has
-                console.log("giving money to", recipient.name);
-                console.log("he has already been allocated", recipient.assignedTo);
-                console.log("his winnings are", recipient.winnings);
                 recipient.winnings.set(pla.id, recipient.winnings.get(pla.id)+game.bet);//increase the amount the owing player pays the recipient by one bet
-                console.log("the recipient now gets: ", recipient.winnings);
                 recipient.assignedTo=recipient.assignedTo+100;//set the amount the recipient has been assigned
-                console.log("his allocation is now ", recipient.assignedTo);
                 await recipient.save()//save the recipient
                 pla.assignedTo = pla.assignedTo-100;//set the amount the donor has been assigned
-                console.log("the player has now been allocated", pla.assignedTo);
             }
             await pla.save();//save the donor
         }
