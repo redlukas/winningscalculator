@@ -1,6 +1,6 @@
 {
   "name": "winningscalculator",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "",
   "main": "model.js",
   "scripts": {
@@ -23,8 +23,6 @@
     "cors": "^2.8.5",
     "express": "^4.17.1",
     "joi": "^17.4.2",
-    "mongoose": "^5.13.5",
-    "nodemon": "^2.0.12",
-    "underscore": "^1.13.1"
+    "mongoose": "^6.0.4"
   }
 }

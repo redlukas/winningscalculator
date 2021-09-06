@@ -408,7 +408,6 @@ async function checkWinningsTotal() {
  * @returns {Promise<Player>} The Player that owes the most money to the donor
  */
 async function findMostSuitableRecipient(donor) {
-    console.log("finding the best recipient for " + donor.name + "'s money");
     const players = await Player.find();
     let highscore = 0;
     let highestScoring = await players.find(player => player.winnings.get("pot") > 0 && player.entitledTo > player.assignedTo);
@@ -420,7 +419,6 @@ async function findMostSuitableRecipient(donor) {
             }
         }
     }
-    console.log("it is ", highestScoring.name);
     return highestScoring;
 }
 
